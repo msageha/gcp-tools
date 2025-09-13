@@ -1,5 +1,4 @@
 import logging
-from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import ClassVar
 
@@ -144,7 +143,7 @@ class CustomJobManager:
         """
         self.project_id = project_id
         if isinstance(job_labels, JobLabels):
-            job_labels = asdict(job_labels)
+            job_labels = job_labels.model_dump()
         if job_labels is not None:
             job_labels = {k.lower(): v.lower() for k, v in job_labels.items()}
         self.job_labels = job_labels
