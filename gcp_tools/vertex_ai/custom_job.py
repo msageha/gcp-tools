@@ -17,6 +17,7 @@ from google.cloud.aiplatform_v1.types import (
 from google.cloud.aiplatform_v1beta1.types.accelerator_type import AcceleratorType
 from google.protobuf import duration_pb2
 from googleapiclient import errors
+from pydantic import ValidationError
 
 from gcp_tools.vertex_ai.utils import (
     DEFAULT_AI_PLATFORM_REGION,
@@ -204,7 +205,7 @@ class CustomJobManager:
             job_id: Optional[str].
                 The display name of the CustomJob.
                 The name can be up to 128 characters long and can be consist of any UTF-8 characters.
-                If it's unspecified, job_id is `platform_integration_train_{"%Y%m%d%H%M"}`.
+                If it's unspecified, job_id is `custom_job_{"%Y%m%d%H%M"}`.
             service_account: Optional[str].
                 The email address of a user-managed service account to be used for training instead of
                 the service account that Vertex AI Training uses by default.
@@ -233,7 +234,11 @@ class CustomJobManager:
         """
 
         if job_id is None:
-            job_id = self._generate_job_id()
+            try:
+                job_labels = JobLabels(**self.job_labels)
+                job_id = job_labels.get_job_id()
+            except ValidationError:
+                job_id = self._generate_job_id()
 
         self._validate_machine_config(
             machine_type=machine_type,
@@ -425,9 +430,8 @@ class CustomJobManager:
 
     @staticmethod
     def _generate_job_id():
-        """Returns a unique job id prefixed with 'platform_integration_train'."""
         utc_time = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M")
-        return f"platform_integration_train_{utc_time}"
+        return f"custom_job_{utc_time}"
 
     def list_jobs(self) -> list[CustomJob]:
         jobs = self.client.list_custom_jobs(
@@ -487,12 +491,14 @@ if __name__ == "__main__":
     job_labels = JobLabels(
         task="test",
     )
-
     manager = CustomJobManager(
         project_id,
-        job_labels,
+        job_labels=job_labels,
     )
 
-    job_info = manager.deploy_job(image_uri, machine_type="n1-standard-4")
+    job_info = manager.deploy_job(
+        image_uri,
+        machine_type="n1-standard-4",
+    )
     url = manager.get_job_url(name=job_info.name)
     print(url)
